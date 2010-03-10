@@ -13,6 +13,10 @@ define('EXECUTIONS', 20);
 $elements = array(10, 100, 500, 1000, 5000);
 $files = glob('tests/*.php');
 
+if (!file_exists('results')) {
+    mkdir('results');
+}
+
 $log = fopen('results/raw.csv', 'w');
 fputcsv($log, array('Elements', 'File', 'Time', 'RPS', 'Memory'));
 
