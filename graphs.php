@@ -37,6 +37,6 @@ foreach ($data as $measurement => $components) {
         foreach ($tests as $test => $elements) {
             $graph->data[$test] = new ezcGraphArrayDataSet($elements);
         }
-        $graph->render(550, 225, 'results/' . $component . '_' . $measurement . '.svg');
+        $graph->render(400, 225, 'results/' . $component . '_' . $measurement . '.svg');
     }
 }
