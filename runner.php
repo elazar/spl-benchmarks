@@ -8,7 +8,7 @@
  */
 
 define('PHP_CGI_PATH', '/home/matt/Downloads/php-5.3.2/build/php_build/bin/php-cgi');
-define('EXECUTIONS', 20);
+define('EXECUTIONS', 50);
 
 $elements = array(10, 100, 500, 1000, 5000);
 $files = glob('tests/*.php');
@@ -18,7 +18,7 @@ if (!file_exists('results')) {
 }
 
 $log = fopen('results/raw.csv', 'w');
-fputcsv($log, array('Elements', 'File', 'Time', 'RPS', 'Memory'));
+fputcsv($log, array('Elements', 'File', 'Time', 'EPS', 'Memory'));
 
 $descriptor = array(
     0 => array('pipe', 'r'), // stdin
@@ -47,13 +47,13 @@ foreach ($elements as $count) {
         $fields = explode(' ', trim($stderr));
         $total = $fields[2];
         $time = $total / EXECUTIONS;
-        $rps = 1 / $time;
+        $eps = 1 / $time;
 
         fputcsv($log, array(
             $count,
             basename($file),
             $time,
-            $rps,
+            $eps,
             $memory
         ));
     }
