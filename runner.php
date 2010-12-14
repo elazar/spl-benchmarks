@@ -1,13 +1,13 @@
 <?php
 
 /**
- * This script executes the SPL test scripts located in the tests 
- * subdirectory, measure the average execution time and memory usage for a 
- * specified number of executions, and records it in a CSV file for later 
+ * This script executes the SPL test scripts located in the tests
+ * subdirectory, measure the average execution time and memory usage for a
+ * specified number of executions, and records it in a CSV file for later
  * use.
  */
 
-define('PHP_CGI_PATH', '/home/matt/Downloads/php-5.3.2/build/php_build/bin/php-cgi');
+define('PHP_CGI_PATH', '/home/matt/Downloads/php-5.3.4/build/php_build/bin/php-cgi');
 define('EXECUTIONS', 50);
 
 $elements = array(10, 100, 500, 1000, 5000);
