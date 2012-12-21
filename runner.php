@@ -7,7 +7,7 @@
  * use.
  */
 
-define('PHP_CGI_PATH', '/home/matt/Downloads/php-5.3.4/build/php_build/bin/php-cgi');
+define('PHP_CGI_PATH', basename($_ENV['_']) === 'php-cgi' ? $_ENV['_'] : dirname($_ENV['_']) . '/php-cgi');
 define('EXECUTIONS', 50);
 
 $elements = array(10, 100, 500, 1000, 5000);
