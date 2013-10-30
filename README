@@ -10,5 +10,9 @@ tests - Contains two scripts per SPL data structure class, one for SPL
 results - Destination of aggregated results from runner.php and charts from 
           graphs.php
 
+NOTES: Runner executes tests with php-cgi. Make sure php-cgi.ini has register_argc_argv
+set to On. Also make sure that in php.ini "variables_order" contains 'E' so that
+runner can resolve path to php binaries.
+
 Blog post http://matthewturland.com/2010/05/20/new-spl-features-in-php-5-3/
 Slides http://www.slideshare.net/tobias382/new-spl-features-in-php-53
