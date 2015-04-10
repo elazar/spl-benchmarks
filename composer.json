@@ -1,0 +1,21 @@
+{
+    "name": "elazar/spl-benchmarks",
+    "description": "Runs a set of benchmarks for PHP SPL classes and equivalent array-based implementations",
+    "keywords": [ "php", "spl", "benchmarks" ],
+    "license": "BSD-2-Clause",
+    "require": {
+        "zetacomponents/graph": "~1.5",
+        "symfony/console": "~2.6",
+        "symfony/finder": "~2.6",
+        "symfony/filesystem": "~2.6",
+        "react/child-process": "~0.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Elazar\\SplBenchmarks\\": "src"
+        }
+    },
+    "bin": [
+        "bin/spl-benchmarks"
+    ]
+}
