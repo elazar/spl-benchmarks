@@ -54,56 +54,57 @@ class RunBenchmarksCommand extends Command
                 'benchmarks',
                 'b',
                 InputOption::VALUE_OPTIONAL,
-                'Comma-delimited list of benchmark pairs from benchmarks/ to run, defaults to "' . $benchmarks . '"',
+                'Comma-delimited list of benchmark pairs from benchmarks/ to run',
                 $benchmarks
             )
             ->addOption(
                 'chart-font',
                 'cf',
                 InputOption::VALUE_OPTIONAL,
-                'Path to TrueType Font file to use in generated charts, defaults to Arial on *NIX',
+                'Path to TrueType Font file to use in generated charts',
                 '/usr/share/fonts/truetype/msttcorefonts/arial.ttf'
             )
             ->addOption(
                 'chart-dimensions',
                 'cd',
                 InputOption::VALUE_OPTIONAL,
-                'Dimensions for generated charts in the form WxH, defaults to 400x225',
+                'Dimensions for generated charts in the form WxH',
                 '800x450'
             )
             ->addOption(
                 'cpus',
                 'c',
                 InputOption::VALUE_OPTIONAL,
-                'Number of processors to use when running benchmarks, defaults to 2',
+                'Number of processors to use when running benchmarks',
                 2
             )
             ->addOption(
                 'destination',
                 'd',
                 InputOption::VALUE_OPTIONAL,
-                'Path to which to write the benchmark results, defaults to ./results',
+                'Path to which to write the benchmark results',
                 './results'
             )
             ->addOption(
                 'elements',
                 'l',
                 InputOption::VALUE_OPTIONAL,
-                'Comma-delimited list of quantities of elements to use per test, defaults to "10,100,500,1000,5000"',
+                'Comma-delimited list of quantities of elements to use per test',
                 '10,100,500,1000,5000'
             )
             ->addOption(
                 'executions',
                 'x',
                 InputOption::VALUE_OPTIONAL,
-                'Number of executions per test, defaults to 50',
+                'Number of executions per test',
                 50
             )
             ->addOption(
                 'php-path',
                 'p',
                 InputOption::VALUE_OPTIONAL,
-                'Path to the php CLI executable'
+                'Path to the php CLI executable',
+                \PHP_BINDIR . '/php'
             );
     }
 
