@@ -4,7 +4,6 @@ namespace Elazar\SplBenchmarks;
 
 use React\EventLoop\LoopInterface;
 use React\EventLoop\Factory as LoopFactory;
-use React\ChildProcess\Process;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -59,6 +58,20 @@ class RunBenchmarksCommand extends Command
                 $benchmarks
             )
             ->addOption(
+                'chart-font',
+                'cf',
+                InputOption::VALUE_OPTIONAL,
+                'Path to TrueType Font file to use in generated charts, defaults to Arial on *NIX',
+                '/usr/share/fonts/truetype/msttcorefonts/arial.ttf'
+            )
+            ->addOption(
+                'chart-dimensions',
+                'cd',
+                InputOption::VALUE_OPTIONAL,
+                'Dimensions for generated charts in the form WxH, defaults to 400x225',
+                '800x450'
+            )
+            ->addOption(
                 'cpus',
                 'c',
                 InputOption::VALUE_OPTIONAL,
@@ -96,97 +109,146 @@ class RunBenchmarksCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        // Define a function for deriving commands to execute
-        $php_path = $this->getPhpPath($input);
-        $base_path = __DIR__ . '/../benchmarks';
-        $get_cmd = function($benchmark, $sub_benchmark, $count)
-            use ($base_path, $php_path) {
-            $file = $base_path . '/' . $benchmark . '-' . $sub_benchmark . '.php';
-            return $php_path
-                . ' -d max_execution_time=0'
-                . ' -d auto_append_file="' . $base_path . '/memory.php"'
-                . ' ' . $file . ' ' . $count;
-        };
-
-        // Derive all needed parameter permutations for the commands to execute
-        $elements = $this->getElements($input);
-        $benchmarks = $this->getBenchmarks($input);
-        $executions = $this->getExecutions($input);
-        $cmds = [];
-        foreach ($elements as $count) {
-            foreach ($benchmarks as $benchmark) {
-                foreach (['s', 'a'] as $sub_benchmark) {
-                    foreach (range(1, $executions) as $execution) {
-                        $cmds[] = [$benchmark, $sub_benchmark, $count];
-                    }
-                }
-            }
-        }
-
-        // Define a function for creating processes to execute the commands
-        $loop = $this->getLoop();
-        $processes = $stdout = $stderr = [];
-        $process_id = 0;
-        $queue_process = function()
-            use ($get_cmd, $loop, $output, &$queue_process, &$cmds, &$processes, &$process_id) {
-            if (empty($cmds)) {
-                return;
-            }
-            list($benchmark, $sub_benchmark, $count) = array_shift($cmds);
-            $output->writeln('<info>Start: ' . $benchmark . '-' . $sub_benchmark . ' ' . $count . '</info>');
-            $cmd = $get_cmd($benchmark, $sub_benchmark, $count);
-            $key = serialize([$benchmark, $sub_benchmark, $count]);
-            $stdout[$key] = $stderr[$key] = '';
-            $current_process_id = $process_id;
-            $process_id++;
-            $processes[$current_process_id] = $process = new Process($cmd);
-            $process->on('exit', function($code, $signal)
-                use ($queue_process, $output, $benchmark, $sub_benchmark, $count, &$processes, &$current_process_id) {
-                $output->writeln('<info>End: ' . $benchmark . '-' . $sub_benchmark . ' ' . $count . '</info>');
-                unset($processes[$current_process_id]);
-                $queue_process();
-            });
-            $loop->addTimer(0.001, function($timer) use ($process, $key, &$stdout, &$stderr) {
-                $process->start($timer->getLoop());
-                $process->stdout->on('data', function($data) use (&$stdout, $key) {
-                    $stdout[$key] .= $data;
-                });
-                $process->stderr->on('data', function($data) use (&$stderr, $key) {
-                    $stderr[$key] .= $data;
-                });
-            });
-        };
-
-        // Queue the initial set of processes, one per CPU
-        $cpus = $this->getCpus($input);
-        while (count($processes) < $cpus) {
-            $queue_process();
-        }
-        $loop->run();
-
-        // Parse and store the results
         $destination = $this->getDestination($input);
-        $path = $destination . '/raw.csv';
-        $lines = [];
-        foreach ($stdout as $key => $stdout_data) {
-            $stdout_lines = explode(PHP_EOL, $stdout_data);
-            $memory = array_sum($stdout_lines) / $executions;
+        $name = 'raw.csv';
+        $path = $destination . '/' . $name;
 
-            $stderr_fields = explode(' ', trim($stderr[$key]));
-            $time = $stderr_fields[2] / $executions;
-            $eps = 1 / $time;
+        $finder = $this->getFinder()
+            ->files()
+            ->in($destination)
+            ->name($name);
 
-            list($benchmark, $sub_benchmark, $count) = unserialize($key);
-            $file = $benchmark . '-' . $sub_benchmark . '.php';
+        if (count($finder) > 0) {
+            $output->writeln('<info>Existing results file found: ' . $path . '</info>');
+            $results = $this->readRawResults($finder->getIterator()->current()->getContents());
+        } else {
+            $output->writeln('<info>No results file found, running benchmarks</info>');
+
+            $runner = new BenchmarkRunner(
+                $output,
+                $this->getLoop(),
+                $this->getBenchmarkIterator($input),
+                $this->getCpus($input)
+            );
+            $runner->run();
+            $results = $runner->getResults();
+
+            $output->writeln('<info>Storing data in results file: ' . $path . '</info>');
+            $this->writeRawResults($path, $results);
+        }
+
+        $output->writeln('<info>Generating charts</info>');
+        $this->generateCharts($input, $output, $destination, $results);
+
+        $output->writeln('<info>Done</info>');
+    }
+
+    protected function getBenchmarkIterator(InputInterface $input)
+    {
+        return new BenchmarkIterator(
+            $this->getBenchmarks($input),
+            ['s', 'a'],
+            $this->getElements($input),
+            $this->getExecutions($input),
+            $this->getPhpPath($input),
+            __DIR__ . '/../benchmarks'
+        );
+    }
+
+    protected function writeRawResults($path, array $results)
+    {
+        $lines = ['"' . implode('","', ['Elements', 'File', 'Time (μs)', 'Executions/Second', 'Memory (b)']) . '"'];
+        foreach ($results as $result) {
+            $file = $result->benchmark . '-' . $result->subbenchmark . '.php';
             $lines[] = '"' . implode('","', [
-                    $count,
+                    $result->count,
                     $file,
-                    $time,
-                    $eps,
-                    $memory
+                    $result->time,
+                    $result->eps,
+                    $result->memory,
                 ]) . '"';
         }
         $this->getFilesystem()->dumpFile($path, implode(PHP_EOL, $lines));
+    }
+
+    protected function readRawResults($contents)
+    {
+        $lines = array_slice(explode(PHP_EOL, $contents), 1);
+        $results = [];
+        foreach ($lines as $line) {
+            list($count, $file, $time, $eps, $memory) = str_getcsv($line);
+            list($benchmark, $subbenchmark) = explode('-', str_replace('.php', '', $file));
+            $result = new BenchmarkResult;
+            $result->benchmark = $benchmark;
+            $result->subbenchmark = $subbenchmark;
+            $result->count = $count;
+            $result->time = $time;
+            $result->eps = $eps;
+            $result->memory = $memory;
+            $results[] = $result;
+        }
+        return $results;
+    }
+
+    protected function generateCharts(InputInterface $input, OutputInterface $output, $destination, array $results)
+    {
+        $gd_info = gd_info();
+        if (!$gd_info['FreeType Support']) {
+            throw new \RuntimeException('gd extension must be compiled with FreeType support');
+        }
+
+        $font = $this->getChartFont($input);
+        list($width, $height) = $this->getChartDimensions($input);
+        $chart_data = $this->getChartData($results);
+
+        foreach ($chart_data as $measure => $benchmarks) {
+            foreach ($benchmarks as $benchmark => $subbenchmarks) {
+                $file = $destination . '/' . $benchmark . '_' . $measure . '.png';
+                $output->writeln('<comment>Writing ' . $file . '</comment>');
+
+                $driver = new \ezcGraphGdDriver;
+                $driver->options->supersampling = 1;
+                $driver->options->imageFormat = IMG_PNG;
+
+                $graph = new \ezcGraphBarChart;
+                $graph->driver = $driver;
+                $graph->options->font = $font;
+                $graph->xAxis->label = 'Elements';
+                $graph->yAxis->label = ($measure == 'memory') ? 'Memory (KB)' : 'Executions / Second';
+                $graph->title = $benchmark . ' - ' . $measure;
+                foreach ($subbenchmarks as $subbenchmark => $elements) {
+                    $graph->data[$subbenchmark] = new \ezcGraphArrayDataSet($elements);
+                }
+
+                $graph->render($width, $height, $file);
+            }
+        }
+    }
+
+    protected function getChartData(array $results)
+    {
+        $chart_data = [];
+        foreach ($results as $result) {
+            $benchmark = $result->benchmark;
+            $subbenchmark = $result->subbenchmark;
+            $count = $result->count;
+
+            foreach (['memory', 'eps'] as $measure) {
+                if (!isset($chart_data[$measure][$benchmark])) {
+                    $chart_data[$measure][$benchmark] = [];
+                }
+                if (!isset($chart_data[$measure][$benchmark][$subbenchmark])) {
+                    $chart_data[$measure][$benchmark][$subbenchmark] = [];
+                }
+                if (!isset($chart_data[$measure][$benchmark][$subbenchmark][$count])) {
+                    $chart_data[$measure][$benchmark][$subbenchmark][$count] = [];
+                }
+            }
+
+            $chart_data['memory'][$benchmark][$subbenchmark][$count] = ceil($result->memory / 1024); // convert to KB
+            $chart_data['eps'][$benchmark][$subbenchmark][$count] = $result->eps;
+        }
+        return $chart_data;
     }
 
     protected function getBenchmarks(InputInterface $input)
@@ -200,20 +262,45 @@ class RunBenchmarksCommand extends Command
         return $b;
     }
 
+    protected function getChartFont(InputInterface $input)
+    {
+        $cf = $input->getOption('chart-font');
+        if (!is_readable($cf)) {
+            throw new \RuntimeException('--chart-font must reference a readable file path');
+        }
+        return $cf;
+    }
+
+    protected function getChartDimensions(InputInterface $input)
+    {
+        $cd = $input->getOption('chart-dimensions');
+        if (!preg_match('/^(?P<width>[0-9]+)[xX](?P<height>[0-9]+)$/', $cd, $match)) {
+            throw new \DomainException('--chart-dimensions must be of the form WxH');
+        }
+        return [(int) $match['width'], (int) $match['height']];
+    }
+
     protected function getCpus(InputInterface $input)
     {
         $c = $input->getOption('cpus');
         if (!is_int($c) && !ctype_digit($c)) {
             throw new \DomainException('--cpus must be a positive integer: ' . $c);
         }
-        return $c;
+        return (int) $c;
     }
 
     protected function getDestination(InputInterface $input)
     {
         $d = $input->getOption('destination');
+        $dirname = dirname($d);
+        $basename = basename($d);
         $finder = $this->getFinder();
-        $finder->directories()->followLinks()->ignoreUnreadableDirs()->path($d);
+        $finder
+            ->in($dirname)
+            ->name($basename)
+            ->directories()
+            ->followLinks()
+            ->ignoreUnreadableDirs();
         if (!count($finder)) {
             try {
                 $this->getFilesystem()->mkdir($d);
@@ -232,7 +319,7 @@ class RunBenchmarksCommand extends Command
             $invalid = implode(', ', array_diff($e, $filtered));
             throw new \RuntimeException('--elements has invalid values: ' . $invalid);
         }
-        return $e;
+        return array_map('intval', $e);
     }
 
     protected function getExecutions(InputInterface $input)
@@ -241,7 +328,7 @@ class RunBenchmarksCommand extends Command
         if (!is_int($e) && !ctype_digit($e)) {
             throw new \RuntimeException('--executions must be a positive integer: ' . $e);
         }
-        return $e;
+        return (int) $e;
     }
 
     protected function getPhpPath(InputInterface $input)

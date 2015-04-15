@@ -8,7 +8,8 @@
         "symfony/console": "~2.6",
         "symfony/finder": "~2.6",
         "symfony/filesystem": "~2.6",
-        "react/child-process": "~0.4"
+        "react/child-process": "~0.4",
+        "ext-gd": "*"
     },
     "autoload": {
         "psr-4": {

@@ -1,2 +1,4 @@
+results/*.csv
+results/*.png
 vendor/
 composer.lock
