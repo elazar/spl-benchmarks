@@ -4,12 +4,13 @@
     "keywords": [ "php", "spl", "benchmarks" ],
     "license": "BSD-2-Clause",
     "require": {
+        "php": ">=5.4",
+        "ext-gd": "*",
         "zetacomponents/graph": "~1.5",
         "symfony/console": "~2.6",
         "symfony/finder": "~2.6",
         "symfony/filesystem": "~2.6",
-        "react/child-process": "~0.4",
-        "ext-gd": "*"
+        "react/child-process": "~0.4"
     },
     "autoload": {
         "psr-4": {
