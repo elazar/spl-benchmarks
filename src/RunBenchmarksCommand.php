@@ -125,11 +125,13 @@ class RunBenchmarksCommand extends Command
         } else {
             $output->writeln('<info>No results file found, running benchmarks</info>');
 
+            $executions = $this->getExecutions($input);
             $runner = new BenchmarkRunner(
                 $output,
                 $this->getLoop(),
-                $this->getBenchmarkIterator($input),
-                $this->getCpus($input)
+                $this->getBenchmarkIterator($input, $executions),
+                $this->getCpus($input),
+                $executions
             );
             $runner->run();
             $results = $runner->getResults();
@@ -144,13 +146,13 @@ class RunBenchmarksCommand extends Command
         $output->writeln('<info>Done</info>');
     }
 
-    protected function getBenchmarkIterator(InputInterface $input)
+    protected function getBenchmarkIterator(InputInterface $input, $executions)
     {
         return new BenchmarkIterator(
             $this->getBenchmarks($input),
             ['s', 'a'],
             $this->getElements($input),
-            $this->getExecutions($input),
+            $executions,
             $this->getPhpPath($input),
             __DIR__ . '/../benchmarks'
         );

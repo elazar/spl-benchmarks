@@ -29,6 +29,11 @@ class BenchmarkRunner
     protected $cpus;
 
     /**
+     * @var int
+     */
+    protected $executions;
+
+    /**
      * @var \React\ChildProcess\Process[]
      */
     protected $processes;
@@ -53,12 +58,13 @@ class BenchmarkRunner
      */
     protected $results;
 
-    public function __construct(OutputInterface $output, LoopInterface $loop, BenchmarkIterator $benchmarks, $cpus)
+    public function __construct(OutputInterface $output, LoopInterface $loop, BenchmarkIterator $benchmarks, $cpus, $executions)
     {
         $this->output = $output;
         $this->loop = $loop;
         $this->benchmarks = $benchmarks;
         $this->cpus = $cpus;
+        $this->executions = $executions;
     }
 
     public function run()
@@ -83,8 +89,8 @@ class BenchmarkRunner
     {
         foreach ($this->stdout as $key => $stdout_data) {
             $stdout_lines = array_filter(explode(PHP_EOL, $stdout_data));
-            $memory = array_sum($stdout_lines) / $executions;
-            $time = array_sum($this->runtimes[$key]) / $executions;
+            $memory = array_sum($stdout_lines) / $this->executions;
+            $time = array_sum($this->runtimes[$key]) / $this->executions;
             $eps = 1 / $time;
             list($benchmark, $subbenchmark, $count) = unserialize($key);
 
